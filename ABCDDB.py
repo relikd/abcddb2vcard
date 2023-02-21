@@ -5,7 +5,6 @@ from base64 import b64encode
 from urllib.parse import quote
 from typing import List, Dict, Any, Iterable, Optional
 
-PROD_ID = '-//Apple Inc.//Mac OS X 10.15.7//EN'
 ITEM_COUNTER = 0
 
 
@@ -330,41 +329,38 @@ class Record:
     def makeVCard(self) -> str:
         global ITEM_COUNTER
         ITEM_COUNTER = 0
-        t = 'BEGIN:VCARD\r\nVERSION:3.0'
-        t += '\r\nPRODID:' + PROD_ID
+
+        name = ';'.join((self.lastname, self.firstname, self.middlename,
+                         self.nameprefix, self.namesuffix))
+        fullname = self.organization if self.iscompany else ' '.join(
+            filter(None, [self.nameprefix, self.firstname, self.middlename,
+                          self.lastname, self.namesuffix]))
+
+        # rquired fields: BEGIN, END, VERSION, N, FN
+        data = [
+            'BEGIN:VCARD',
+            'VERSION:3.0',
+            'N:' + name,
+            'FN:' + fullname,
+        ]
 
         def optional(key: str, value: Optional[str]) -> None:
-            nonlocal t
             if value:
-                t += '\r\n' + key + ':' + value
+                data.append(key + ':' + value)
 
         def optionalArray(arr: Iterable[Queryable]) -> None:
-            nonlocal t
             isFirst = True
             for x in arr:
-                t += '\r\n' + x.asVCard(markPref=isFirst)
+                data.append(x.asVCard(markPref=isFirst))
                 isFirst = False
 
-        t += '\r\nN:' + ';'.join((self.lastname, self.firstname,
-                                  self.middlename, self.nameprefix,
-                                  self.namesuffix))
-        if self.iscompany:
-            fullname = self.organization
-        else:
-            fullname = ' '.join(filter(None, [
-                self.nameprefix, self.firstname, self.middlename,
-                self.lastname, self.namesuffix]))
-
-        t += '\r\nFN:' + fullname
         optional('NICKNAME', self.nickname)
         optional('X-MAIDENNAME', self.maidenname)
         optional('X-PHONETIC-FIRST-NAME', self.phonetic_firstname)
         optional('X-PHONETIC-MIDDLE-NAME', self.phonetic_middlename)
         optional('X-PHONETIC-LAST-NAME', self.phonetic_lastname)
-
         if self.organization or self.department:
-            t += '\r\nORG:' + self.organization + ';' + self.department
-
+            optional('ORG', self.organization + ';' + self.department)
         optional('X-PHONETIC-ORG', self.phonetic_org)
         optional('TITLE', self.jobtitle)
         optionalArray(self.email)
@@ -378,27 +374,28 @@ class Record:
             key = 'BDAY'
             if self.bday.startswith('1604'):
                 key += ';X-APPLE-OMIT-YEAR=1604'
-            t += '\r\n' + key + ':' + self.bday
+            optional(key, self.bday)
 
         for kind in ['Jabber', 'MSN', 'Yahoo', 'ICQ']:
             isFirst = True
             for x in self.service:
                 if x.service == kind:
-                    t += '\r\n' + x.asSpecialStr(markPref=isFirst)
+                    data.append(x.asSpecialStr(markPref=isFirst))
                     isFirst = False
         optionalArray(self.service)
 
         if self.image:
             try:
-                t += '\r\n' + self.imageAsBase64(self.image)
+                data.append(self.imageAsBase64(self.image))
             except NotImplementedError:
                 print('''Image format not supported.
  Could not extract image for contact: {}
  @: {!r}...
  skipping.'''.format(fullname, self.image[:20]), file=sys.stderr)
         if self.iscompany:
-            t += '\r\nX-ABShowAs:COMPANY'
-        return t + '\r\nEND:VCARD\r\n'
+            data.append('X-ABShowAs:COMPANY')
+        data.append('END:VCARD')
+        return '\r\n'.join(data) + '\r\n'
 
     def imageAsBase64(self, image: bytes) -> str:
         img = image[1:]  # why does Apple prepend \x01 to all images?!
