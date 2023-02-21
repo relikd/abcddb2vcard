@@ -267,6 +267,10 @@ class Record:
             FROM ZABCDRECORD
             WHERE Z_ENT = ?;''', [z_ent])}
 
+    @staticmethod
+    def initEmpty(id: int) -> 'Record':
+        return Record([id] + [None] * 16 + [0])
+
     def __init__(self, row: List[Any]) -> None:
         self.id = row[0]  # type: int
         self.firstname = x520(row[1]) or ''  # type: str
@@ -394,27 +398,34 @@ class ABCDDB:
 
         records = Record.queryAll(cur)
 
+        def _getOrMake(attr: Queryable) -> Record:
+            rec = records.get(attr.parent)
+            if not rec:
+                rec = Record.initEmpty(attr.parent)
+                records[attr.parent] = rec
+            return rec
+
         # query once, then distribute
         for email in Email.queryAll(cur):
-            records[email.parent].email.append(email)
+            _getOrMake(email).email.append(email)
 
         for phone in Phone.queryAll(cur):
-            records[phone.parent].phone.append(phone)
+            _getOrMake(phone).phone.append(phone)
 
         for address in Address.queryAll(cur):
-            records[address.parent].address.append(address)
+            _getOrMake(address).address.append(address)
 
         for social in SocialProfile.queryAll(cur):
-            records[social.parent].socialprofile.append(social)
+            _getOrMake(social).socialprofile.append(social)
 
         for note in Note.queryAll(cur):
-            records[note.parent].note = note.text
+            _getOrMake(note).note = note.text
 
         for url in URL.queryAll(cur):
-            records[url.parent].urls.append(url)
+            _getOrMake(url).urls.append(url)
 
         for service in Service.queryAll(cur):
-            records[service.parent].service.append(service)
+            _getOrMake(service).service.append(service)
 
         db.close()
         return records.values()
