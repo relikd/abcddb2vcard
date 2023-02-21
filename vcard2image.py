@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-import re
 import sys
 from base64 import b64decode
 from pathlib import Path
@@ -25,14 +24,14 @@ with open(infile, 'r') as f:
     c1 = 0
     c2 = 0
     name = ''
-    img = None
+    img = ''
     collect = False
     for line in f.readlines():
         line = line.rstrip()
         if line == 'BEGIN:VCARD':
             c1 += 1
             name = ''
-            img = None
+            img = ''
             collect = False
         elif line.startswith('FN:'):
             name = line.split(':', 1)[1]
