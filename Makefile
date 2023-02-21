@@ -8,7 +8,7 @@ install:
 uninstall:
 	python3 -m pip uninstall abcddb2vcard
 	rm -rf ./*.egg-info/
-	-rm -i "$$(which abcddb2vcard)" "$$(which vcard2img)"
+	@-rm -i "$$(which abcddb2vcard)" "$$(which vcard2img)"
 
 dist: setup.py abcddb2vcard/*
 	[ -z "$${VIRTUAL_ENV}" ]  # you can not do this inside a virtual environment.

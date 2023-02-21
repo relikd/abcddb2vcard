@@ -15,8 +15,8 @@ setup(
     packages=['abcddb2vcard'],
     entry_points={
         'console_scripts': [
-            'abcddb2vcard=abcddb2vcard.abcddb2vcard',
-            'vcard2img=abcddb2vcard.vcard2img',
+            'abcddb2vcard=abcddb2vcard.abcddb2vcard:main',
+            'vcard2img=abcddb2vcard.vcard2img:main',
         ]
     },
     long_description_content_type="text/markdown",
