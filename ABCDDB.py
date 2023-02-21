@@ -65,7 +65,10 @@ class Queryable:  # Protocol
     def parent(self) -> int:
         return self._parent
 
-    def asStr(self, markPref: bool) -> str:
+    def classStr(self, value: str) -> str:
+        return '<{} "{}">'.format(self.__class__.__name__, value)
+
+    def asVCard(self, markPref: bool) -> str:
         raise NotImplementedError()
 
 
@@ -82,9 +85,12 @@ class Email(Queryable):
         self.label = x520(row[1]) or ''  # type: str
         self.email = x520(row[2]) or ''  # type: str
 
-    def asStr(self, markPref: bool) -> str:
-        return buildLabel('EMAIL;type=INTERNET', self.label, markPref,
-                          self.email)
+    def __repr__(self) -> str:
+        return self.classStr(self.email)
+
+    def asVCard(self, markPref: bool) -> str:
+        return buildLabel(
+            'EMAIL;type=INTERNET', self.label, markPref, self.email)
 
 
 class Phone(Queryable):
@@ -100,7 +106,10 @@ class Phone(Queryable):
         self.label = x520(row[1]) or ''  # type: str
         self.number = x520(row[2]) or ''  # type: str
 
-    def asStr(self, markPref: bool) -> str:
+    def __repr__(self) -> str:
+        return self.classStr(self.number)
+
+    def asVCard(self, markPref: bool) -> str:
         mapping = {
             '_$!<Mobile>!$_': ';type=CELL;type=VOICE',
             'iPhone': ';type=IPHONE;type=CELL;type=VOICE',
@@ -138,11 +147,15 @@ class Address(Queryable):
         self.zip = x520(row[5]) or ''  # type: str
         self.country = x520(row[6]) or ''  # type: str
 
-    def asStr(self, markPref: bool) -> str:
-        value = ';'.join((self.street, self.city, self.state, self.zip,
-                          self.country))
-        return buildLabel('ADR', self.label, markPref, ';;' + value,
-                          validOther=True)
+    def __repr__(self) -> str:
+        return self.classStr(', '.join(filter(None, (
+            self.street, self.city, self.state, self.zip, self.country))))
+
+    def asVCard(self, markPref: bool) -> str:
+        value = ';'.join((
+            self.street, self.city, self.state, self.zip, self.country))
+        return buildLabel(
+            'ADR', self.label, markPref, ';;' + value, validOther=True)
 
 
 class SocialProfile(Queryable):
@@ -158,7 +171,10 @@ class SocialProfile(Queryable):
         # no x520(); actually, Apple does that ... and it breaks on reimport
         self.user = row[2] or ''  # type: str
 
-    def asStr(self, markPref: bool) -> str:
+    def __repr__(self) -> str:
+        return self.classStr(self.service + ':' + self.user)
+
+    def asVCard(self, markPref: bool) -> str:
         # Apple does some x-user, x-apple, and url stuff that is wrong
         return 'X-SOCIALPROFILE;type=' + self.service.lower() + ':' + self.user
 
@@ -175,7 +191,10 @@ class Note(Queryable):
         self._parent = row[0]  # type: int
         self.text = x520(row[1]) or ''  # type: str
 
-    def asStr(self, markPref: bool) -> str:
+    def __repr__(self) -> str:
+        return self.classStr(self.text)
+
+    def asVCard(self, markPref: bool) -> str:
         return self.text
 
 
@@ -192,7 +211,10 @@ class URL(Queryable):
         self.label = x520(row[1]) or ''  # type: str
         self.url = x520(row[2]) or ''  # type: str
 
-    def asStr(self, markPref: bool) -> str:
+    def __repr__(self) -> str:
+        return self.classStr(self.url)
+
+    def asVCard(self, markPref: bool) -> str:
         return buildLabel('URL', self.label, markPref, self.url)
 
 
@@ -213,6 +235,10 @@ class Service(Queryable):
         self.label = x520(row[2]) or ''  # type: str
         self.username = x520(row[3]) or ''  # type: str
 
+    def __repr__(self) -> str:
+        return self.classStr(', '.join((
+            self.service, self.label, self.username)))
+
     def isSpecial(self) -> bool:
         return self.service in ['Jabber', 'MSN', 'Yahoo', 'ICQ']
 
@@ -220,7 +246,7 @@ class Service(Queryable):
         return buildLabel('X-' + self.service.upper(), self.label, markPref,
                           self.username)
 
-    def asStr(self, markPref: bool) -> str:
+    def asVCard(self, markPref: bool) -> str:
         if self.service in ['Jabber', 'GoogleTalk', 'Facebook']:
             typ = 'xmpp'
         elif self.service in ['GaduGadu', 'QQ']:
@@ -316,7 +342,7 @@ class Record:
             nonlocal t
             isFirst = True
             for x in arr:
-                t += '\r\n' + x.asStr(markPref=isFirst)
+                t += '\r\n' + x.asVCard(markPref=isFirst)
                 isFirst = False
 
         t += '\r\nN:' + ';'.join((self.lastname, self.firstname,
@@ -403,6 +429,7 @@ class ABCDDB:
             if not rec:
                 rec = Record.initEmpty(attr.parent)
                 records[attr.parent] = rec
+                print('Found unreferenced data field:', attr, file=sys.stderr)
             return rec
 
         # query once, then distribute
