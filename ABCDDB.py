@@ -251,6 +251,11 @@ class Service(Queryable):
 class Record:
     @staticmethod
     def queryAll(cursor: sqlite3.Cursor) -> Dict[int, 'Record']:
+        # get z_ent id that is used for contact cards
+        z_ent = cursor.execute(
+            'SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME == "ABCDContact"'
+        ).fetchone()[0]
+        # find all records that match this id
         return {x[0]: Record(x) for x in cursor.execute('''
             SELECT Z_PK,
                 ZFIRSTNAME, ZLASTNAME, ZMIDDLENAME, ZTITLE, ZSUFFIX,
@@ -260,7 +265,7 @@ class Record:
                 strftime('%Y-%m-%d', ZBIRTHDAY + 978307200, 'unixepoch'),
                 ZTHUMBNAILIMAGEDATA, ZDISPLAYFLAGS
             FROM ZABCDRECORD
-            WHERE ZCONTAINER1 IS NOT NULL;''')}
+            WHERE Z_ENT = ?;''', [z_ent])}
 
     def __init__(self, row: List[Any]) -> None:
         self.id = row[0]  # type: int
