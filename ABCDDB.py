@@ -294,7 +294,7 @@ class Record:
 
     @staticmethod
     def initEmpty(id: int) -> 'Record':
-        return Record([id] + [None] * 16 + [0])
+        return Record([id] + [None] * 17)
 
     def __init__(self, row: List[Any]) -> None:
         self.id = row[0]  # type: int
@@ -321,7 +321,8 @@ class Record:
         self.urls = []  # type: List[URL]
         self.service = []  # type: List[Service]
         self.image = row[16]  # type: Optional[bytes]
-        self.iscompany = row[17] & 1  # type: bool
+        display_flags = row[17] or 0  # type: int
+        self.iscompany = bool(display_flags & 1)  # type: bool
 
     def __repr__(self) -> str:
         return self.makeVCard()
@@ -415,7 +416,7 @@ class Record:
 
 class ABCDDB:
     @staticmethod
-    def load(db_path: str) -> Iterable['Record']:
+    def load(db_path: str) -> List['Record']:
         db = sqlite3.connect(db_path)
         cur = db.cursor()
 
@@ -452,4 +453,4 @@ class ABCDDB:
             _getOrMake(service).service.append(service)
 
         db.close()
-        return records.values()
+        return list(records.values())
