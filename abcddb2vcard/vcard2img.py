@@ -51,3 +51,4 @@ for line in args.input.readlines():
             fw.write(b64decode(img))
 
 print(c1, 'contacts.', c2, 'images.')
+exit()

@@ -4,9 +4,12 @@ Extract data from AddressBook database (.abcddb) to Contacts VCards file (.vcf)
 '''
 import os
 import sys
-from ABCDDB import ABCDDB
 from pathlib import Path
 from argparse import ArgumentParser
+try:
+    from .ABCDDB import ABCDDB
+except ImportError:  # fallback if not run as module
+    from ABCDDB import ABCDDB  # type: ignore[import, no-redef]
 
 
 DB_FILE = str(Path.home().joinpath(
@@ -41,3 +44,5 @@ with open(args.output, 'w') as f:
     for rec in contacts:
         f.write(rec.makeVCard())
     print(len(contacts), 'contacts.')
+
+exit()
