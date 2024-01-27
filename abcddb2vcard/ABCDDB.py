@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import sys
 import sqlite3
 from base64 import b64encode
@@ -8,6 +9,7 @@ from typing import List, Dict, Any, Iterable, Optional
 ITEM_COUNTER = 0
 rx_query = re.compile(r'SELECT([\s\S]*)FROM[\s]+([A-Z_]+)')
 rx_cols = re.compile(r'[\s,;](Z[A-Z_]+)')
+rx_tags = re.compile(r'\%\{[A-Za-z_]+?\}')
 
 # ===============================
 #   Helper methods
@@ -337,26 +339,35 @@ class Record:
         self.image = row[16]  # type: Optional[bytes]
         display_flags = row[17] or 0  # type: int
         self.iscompany = bool(display_flags & 1)  # type: bool
+        self.fullname = self.organization if self.iscompany else ' '.join(
+            filter(None, [self.nameprefix, self.firstname, self.middlename,
+                          self.lastname, self.namesuffix]))
 
     def __repr__(self) -> str:
         return self.makeVCard()
+
+    def formatFilename(self, format: str) -> str:
+        matches = rx_tags.findall(format)
+        for tag in matches:
+            value = getattr(self, tag[2:-1])
+            if isinstance(value, list):
+                value = value[0] if len(value) else None
+            if isinstance(value, Queryable):
+                value = value.asPrintable()
+            format = format.replace(tag, str(value or '').replace('/', ':'))
+        return format
 
     def makeVCard(self) -> str:
         global ITEM_COUNTER
         ITEM_COUNTER = 0
 
-        name = ';'.join((self.lastname, self.firstname, self.middlename,
-                         self.nameprefix, self.namesuffix))
-        fullname = self.organization if self.iscompany else ' '.join(
-            filter(None, [self.nameprefix, self.firstname, self.middlename,
-                          self.lastname, self.namesuffix]))
-
         # rquired fields: BEGIN, END, VERSION, N, FN
         data = [
             'BEGIN:VCARD',
             'VERSION:3.0',
-            'N:' + name,
-            'FN:' + fullname,
+            'N:' + ';'.join((self.lastname, self.firstname, self.middlename,
+                             self.nameprefix, self.namesuffix)),
+            'FN:' + self.fullname,
         ]
 
         def optional(key: str, value: Optional[str]) -> None:
@@ -406,7 +417,7 @@ class Record:
                 print('''Image format not supported.
  Could not extract image for contact: {}
  @: {!r}...
- skipping.'''.format(fullname, self.image[:20]), file=sys.stderr)
+ skipping.'''.format(self.fullname, self.image[:20]), file=sys.stderr)
         if self.iscompany:
             data.append('X-ABShowAs:COMPANY')
         data.append('END:VCARD')
