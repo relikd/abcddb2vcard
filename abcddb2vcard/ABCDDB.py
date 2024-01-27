@@ -76,8 +76,11 @@ class Queryable:  # Protocol
     def parent(self) -> int:
         return self._parent
 
-    def classStr(self, value: str) -> str:
-        return '<{} "{}">'.format(self.__class__.__name__, value)
+    def __repr__(self) -> str:
+        return '<{} "{}">'.format(self.__class__.__name__, self.asPrintable())
+
+    def asPrintable(self) -> str:
+        return '?'
 
     def asVCard(self, markPref: bool) -> str:
         raise NotImplementedError()
@@ -96,8 +99,8 @@ class Email(Queryable):
         self.label = x520(row[1]) or ''  # type: str
         self.email = x520(row[2]) or ''  # type: str
 
-    def __repr__(self) -> str:
-        return self.classStr(self.email)
+    def asPrintable(self) -> str:
+        return self.email
 
     def asVCard(self, markPref: bool) -> str:
         return buildLabel(
@@ -117,8 +120,8 @@ class Phone(Queryable):
         self.label = x520(row[1]) or ''  # type: str
         self.number = x520(row[2]) or ''  # type: str
 
-    def __repr__(self) -> str:
-        return self.classStr(self.number)
+    def asPrintable(self) -> str:
+        return self.number
 
     def asVCard(self, markPref: bool) -> str:
         mapping = {
@@ -158,9 +161,9 @@ class Address(Queryable):
         self.zip = x520(row[5]) or ''  # type: str
         self.country = x520(row[6]) or ''  # type: str
 
-    def __repr__(self) -> str:
-        return self.classStr(', '.join(filter(None, (
-            self.street, self.city, self.state, self.zip, self.country))))
+    def asPrintable(self) -> str:
+        return ', '.join(filter(None, (
+            self.street, self.city, self.state, self.zip, self.country)))
 
     def asVCard(self, markPref: bool) -> str:
         value = ';'.join((
@@ -182,8 +185,8 @@ class SocialProfile(Queryable):
         # no x520(); actually, Apple does that ... and it breaks on reimport
         self.user = row[2] or ''  # type: str
 
-    def __repr__(self) -> str:
-        return self.classStr(self.service + ':' + self.user)
+    def asPrintable(self) -> str:
+        return self.service + ':' + self.user
 
     def asVCard(self, markPref: bool) -> str:
         # Apple does some x-user, x-apple, and url stuff that is wrong
@@ -202,8 +205,8 @@ class Note(Queryable):
         self._parent = row[0]  # type: int
         self.text = x520(row[1]) or ''  # type: str
 
-    def __repr__(self) -> str:
-        return self.classStr(self.text)
+    def asPrintable(self) -> str:
+        return self.text
 
     def asVCard(self, markPref: bool) -> str:
         return self.text
@@ -222,8 +225,8 @@ class URL(Queryable):
         self.label = x520(row[1]) or ''  # type: str
         self.url = x520(row[2]) or ''  # type: str
 
-    def __repr__(self) -> str:
-        return self.classStr(self.url)
+    def asPrintable(self) -> str:
+        return self.url
 
     def asVCard(self, markPref: bool) -> str:
         return buildLabel('URL', self.label, markPref, self.url)
@@ -246,9 +249,8 @@ class Service(Queryable):
         self.label = x520(row[2]) or ''  # type: str
         self.username = x520(row[3]) or ''  # type: str
 
-    def __repr__(self) -> str:
-        return self.classStr(', '.join((
-            self.service, self.label, self.username)))
+    def asPrintable(self) -> str:
+        return ', '.join((self.service, self.label, self.username))
 
     def isSpecial(self) -> bool:
         return self.service in ['Jabber', 'MSN', 'Yahoo', 'ICQ']
