@@ -8,15 +8,21 @@ The output of this script should be exactly the same as dragging and dropping th
 
 ### Usage
 
-```
+```sh
 python3 abcddb2vcard.py backup/contacts_$(date +"%Y-%m-%d").vcf
 ```
 
 > assuming db is located at "~/Library/Application Support/AddressBook/AddressBook-v22.abcddb"
 
+#### Export into individual files
+
+```sh
+python3 abcddb2vcard.py outdir -s 'path/%{fullname}.vcf'
+```
+
 #### Extract contact images
 
-```
+```sh
 python3 vcard2image.py AllContacts.vcf ./profile_pics/
 ```
 

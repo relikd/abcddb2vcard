@@ -6,7 +6,8 @@ from urllib.parse import quote
 from typing import List, Dict, Any, Iterable, Optional
 
 ITEM_COUNTER = 0
-
+rx_query = re.compile(r'SELECT([\s\S]*)FROM[\s]+([A-Z_]+)')
+rx_cols = re.compile(r'[\s,;](Z[A-Z_]+)')
 
 # ===============================
 #   Helper methods
@@ -47,6 +48,17 @@ def buildLabel(
         return incrItem(value, label)
 
 
+def sanitize(cursor: sqlite3.Cursor, query: str) -> str:
+    cols, table = rx_query.findall(query)[0]
+    sel_cols = {x for x in rx_cols.findall(cols)}
+    all_cols = {x[1] for x in cursor.execute(f'PRAGMA table_info({table});')}
+    missing_cols = sel_cols.difference(all_cols)
+    for missing in missing_cols:
+        print(f'WARN: column "{missing}" not found in {table}. Ignoring.',
+              file=sys.stderr)
+        query = query.replace(missing, 'NULL')
+    return query
+
 # ===============================
 #   VCARD Attributes
 # ===============================
@@ -74,10 +86,10 @@ class Queryable:  # Protocol
 class Email(Queryable):
     @staticmethod
     def queryAll(cursor: sqlite3.Cursor) -> Iterable['Email']:
-        return (Email(x) for x in cursor.execute('''
+        return (Email(x) for x in cursor.execute(sanitize(cursor, '''
             SELECT ZOWNER, ZLABEL, ZADDRESS
             FROM ZABCDEMAILADDRESS
-            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;'''))
+            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;''')))
 
     def __init__(self, row: List[Any]):
         self._parent = row[0]  # type: int
@@ -95,10 +107,10 @@ class Email(Queryable):
 class Phone(Queryable):
     @staticmethod
     def queryAll(cursor: sqlite3.Cursor) -> Iterable['Phone']:
-        return (Phone(x) for x in cursor.execute('''
+        return (Phone(x) for x in cursor.execute(sanitize(cursor, '''
             SELECT ZOWNER, ZLABEL, ZFULLNUMBER
             FROM ZABCDPHONENUMBER
-            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;'''))
+            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;''')))
 
     def __init__(self, row: List[Any]):
         self._parent = row[0]  # type: int
@@ -131,11 +143,11 @@ class Phone(Queryable):
 class Address(Queryable):
     @staticmethod
     def queryAll(cursor: sqlite3.Cursor) -> Iterable['Address']:
-        return (Address(x) for x in cursor.execute('''
+        return (Address(x) for x in cursor.execute(sanitize(cursor, '''
             SELECT ZOWNER, ZLABEL,
                 ZSTREET, ZCITY, ZSTATE, ZZIPCODE, ZCOUNTRYNAME
             FROM ZABCDPOSTALADDRESS
-            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;'''))
+            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;''')))
 
     def __init__(self, row: List[Any]):
         self._parent = row[0]  # type: int
@@ -160,9 +172,9 @@ class Address(Queryable):
 class SocialProfile(Queryable):
     @staticmethod
     def queryAll(cursor: sqlite3.Cursor) -> Iterable['SocialProfile']:
-        return (SocialProfile(x) for x in cursor.execute('''
+        return (SocialProfile(x) for x in cursor.execute(sanitize(cursor, '''
             SELECT ZOWNER, ZSERVICENAME, ZUSERNAME
-            FROM ZABCDSOCIALPROFILE;'''))
+            FROM ZABCDSOCIALPROFILE;''')))
 
     def __init__(self, row: List[Any]):
         self._parent = row[0]  # type: int
@@ -181,10 +193,10 @@ class SocialProfile(Queryable):
 class Note(Queryable):
     @staticmethod
     def queryAll(cursor: sqlite3.Cursor) -> Iterable['Note']:
-        return (Note(x) for x in cursor.execute('''
+        return (Note(x) for x in cursor.execute(sanitize(cursor, '''
             SELECT ZCONTACT, ZTEXT
             FROM ZABCDNOTE
-            WHERE ZTEXT IS NOT NULL;'''))
+            WHERE ZTEXT IS NOT NULL;''')))
 
     def __init__(self, row: List[Any]):
         self._parent = row[0]  # type: int
@@ -200,10 +212,10 @@ class Note(Queryable):
 class URL(Queryable):
     @staticmethod
     def queryAll(cursor: sqlite3.Cursor) -> Iterable['URL']:
-        return (URL(x) for x in cursor.execute('''
+        return (URL(x) for x in cursor.execute(sanitize(cursor, '''
             SELECT ZOWNER, ZLABEL, ZURL
             FROM ZABCDURLADDRESS
-            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;'''))
+            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;''')))
 
     def __init__(self, row: List[Any]):
         self._parent = row[0]  # type: int
@@ -220,11 +232,11 @@ class URL(Queryable):
 class Service(Queryable):
     @staticmethod
     def queryAll(cursor: sqlite3.Cursor) -> Iterable['Service']:
-        return (Service(x) for x in cursor.execute('''
+        return (Service(x) for x in cursor.execute(sanitize(cursor, '''
             SELECT ZOWNER, ZSERVICENAME, ZLABEL, ZADDRESS
             FROM ZABCDMESSAGINGADDRESS
             INNER JOIN ZABCDSERVICE ON ZSERVICE = ZABCDSERVICE.Z_PK
-            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;'''))
+            ORDER BY ZOWNER, ZISPRIMARY DESC, ZORDERINGINDEX;''')))
 
     def __init__(self, row: List[Any]):
         self._parent = row[0]  # type: int
@@ -281,7 +293,7 @@ class Record:
             'SELECT Z_ENT FROM Z_PRIMARYKEY WHERE Z_NAME == "ABCDContact"'
         ).fetchone()[0]
         # find all records that match this id
-        return {x[0]: Record(x) for x in cursor.execute('''
+        return {x[0]: Record(x) for x in cursor.execute(sanitize(cursor, '''
             SELECT Z_PK,
                 ZFIRSTNAME, ZLASTNAME, ZMIDDLENAME, ZTITLE, ZSUFFIX,
                 ZNICKNAME, ZMAIDENNAME,
@@ -290,7 +302,7 @@ class Record:
                 strftime('%Y-%m-%d', ZBIRTHDAY + 978307200, 'unixepoch'),
                 ZTHUMBNAILIMAGEDATA, ZDISPLAYFLAGS
             FROM ZABCDRECORD
-            WHERE Z_ENT = ?;''', [z_ent])}
+            WHERE Z_ENT = ?;'''), [z_ent])}
 
     @staticmethod
     def initEmpty(id: int) -> 'Record':
