@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import re
 import sys
 import sqlite3
@@ -57,8 +58,11 @@ def sanitize(cursor: sqlite3.Cursor, query: str) -> str:
     all_cols = {x[1] for x in cursor.execute(f'PRAGMA table_info({table});')}
     missing_cols = sel_cols.difference(all_cols)
     for missing in missing_cols:
-        print(f'WARN: column "{missing}" not found in {table}. Ignoring.',
-              file=sys.stderr)
+        if missing == 'ZSERVICENAME':
+            pass  # ignore irrelevant fields
+        else:
+            print(f'[WARN] Column "{missing}" not found in {table}. Ignoring.',
+                  file=sys.stderr)
         query = query.replace(missing, 'NULL')
     return query
 
@@ -413,28 +417,54 @@ class Record:
         optionalArray(self.service)
 
         if self.image:
-            try:
-                data.append(self.imageAsBase64(self.image))
-            except NotImplementedError:
-                print('''Image format not supported.
- Could not extract image for contact: {}
- @: {!r}...
- skipping.'''.format(self.fullname, self.image[:20]), file=sys.stderr)
+            data.append(self.imageAsBase64())
         if self.iscompany:
             data.append('X-ABShowAs:COMPANY')
         data.append('END:VCARD')
         return '\r\n'.join(data) + '\r\n'
 
-    def imageAsBase64(self, image: bytes) -> str:
-        img = image[1:]  # why does Apple prepend \x01 to all images?!
+    def imageAsBase64(self) -> str:
+        if not self.image:
+            return ''  # already checked before call, never happens
         t = 'PHOTO;ENCODING=b;TYPE='
-        if img[6:10] == b'JFIF':
-            t += 'JPEG:' + b64encode(img).decode('ascii')
-        else:
-            raise NotImplementedError(
-                'Image types other than JPEG are not supported yet.')
+        if self.image[6:10] == b'JFIF':
+            t += 'JPEG:' + b64encode(self.image).decode('ascii')
         # place 'P' manually for nice 75 char alignment
         return t[0] + '\r\n '.join(t[i:i + 74] for i in range(1, len(t), 74))
+
+    def imagePreprocess(self, basePath: str) -> None:
+        # Assumption: Apple uses the first character to determine storage type
+        #  \x01: embedded image
+        #  \x02: external reference
+        if not self.image:
+            return  # no image exists, nothing to do
+
+        if self.image[0] == 1:  # loaded into memory
+            self.image = self.image[1:]  # remove storage type indicator
+
+        elif self.image[0] == 2:  # external referenced image
+            # for whatever reason this is null-terminated
+            imgName = self.image[1:].rstrip(b'\x00').decode('ascii')
+            imgPath = os.path.join(basePath, imgName)
+            if os.path.isfile(imgPath):
+                with open(imgPath, 'rb') as fp:
+                    self.image = fp.read()
+            else:
+                self.image = None
+                raise FileNotFoundError(
+                    f'Image reference not found: {imgPath}')
+        else:
+            raise NotImplementedError(
+                'Unexpected image data[{}]: {!r}'.format(
+                    len(self.image), self.image[:20] + b'...'))
+
+        # by now loaded into memory either way
+        if self.image[6:10] != b'JFIF':
+            self.image = None
+            # We could convert to JPEG but I don't like to introduce a
+            # dependecy on Pillow solely for this use-case.
+            # Should never trigger because Apple converts to JPEG anyway.
+            raise NotImplementedError('Only JPEG images are supported.')
 
 
 # ===============================
@@ -454,7 +484,8 @@ class ABCDDB:
             if not rec:
                 rec = Record.initEmpty(attr.parent)
                 records[attr.parent] = rec
-                print('Found unreferenced data field:', attr, file=sys.stderr)
+                print('[WARN] Found unreferenced data field:', attr,
+                      file=sys.stderr)
             return rec
 
         # query once, then distribute
@@ -480,4 +511,31 @@ class ABCDDB:
             _getOrMake(service).service.append(service)
 
         db.close()
+
+        # support for externally referenced image files
+        # relative to abcddb file: ".AddressBook-v22_SUPPORT/_EXTERNAL_DATA"
+        dbBaseDir = os.path.dirname(os.path.abspath(db_path))
+        dbFilename = os.path.basename(db_path)
+        hiddenMediaDir = f'.{os.path.splitext(dbFilename)[0]}_SUPPORT'
+        extImgDir = os.path.join(dbBaseDir, hiddenMediaDir, '_EXTERNAL_DATA')
+
+        if not os.path.isfile(db_path + '-wal'):
+            print(f'[WARN] "{dbFilename}-wal" not found.',
+                  'Both (-wal & -shm) may store recent changes.',
+                  'Data could be incomplete.',
+                  file=sys.stderr)
+
+        if not os.path.isdir(extImgDir):
+            print(f'[WARN] Hidden folder "{hiddenMediaDir}" is missing.',
+                  'Some images may not be exported (warnings below).',
+                  file=sys.stderr)
+
+        for rec in records.values():
+            try:
+                rec.imagePreprocess(extImgDir)
+            except Exception as e:
+                print('''Could not extract image for contact: {}
+ reason: {}
+ skipping.'''.format(rec.fullname, e), file=sys.stderr)
+
         return list(records.values())

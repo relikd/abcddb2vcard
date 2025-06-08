@@ -2,6 +2,6 @@
 '''
 Convert AddressBook database (.abcddb) to Contacts VCards file (.vcf)
 '''
-__version__ = '1.1.1'
+__version__ = '1.2.0'
 
 from .ABCDDB import ABCDDB

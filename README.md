@@ -35,9 +35,8 @@ python3 vcard2image.py AllContacts.vcf ./profile_pics/
 ### Limitations
 
 The `image` field currently only supports JPG images.
-I have honestly no idea where PNG images are stored.
-For PNGs the database only stores a UUID instead of the file itself.
-If you happen to know where I can find these, open an issue or pull request.
+But as far as I see, Apple converts PNG to JPG before storing the image.
+If you encounter a db which includes other image types, please let me know.
 
 
 ### Disclaimer
