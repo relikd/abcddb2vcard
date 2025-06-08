@@ -26,7 +26,7 @@ def incrItem(value: str, label: str) -> str:
 def x520(val: str) -> Optional[str]:
     if not val:
         return None
-    return val.replace(';', '\\;').replace(',', '\\,')
+    return val.replace(';', '\\;').replace(',', '\\,').replace('\n', '\\n')
 
 
 def buildLabel(
