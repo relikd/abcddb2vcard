@@ -59,7 +59,7 @@ def main() -> None:
             export_count += 1
         except Exception as e:
             print(f'Error processing contact {rec.id} {rec.fullname}: {e}',
-                    file=sys.stderr)
+                  file=sys.stderr)
 
     # choose which export mode to use
     if args.split:  # multi-file mode

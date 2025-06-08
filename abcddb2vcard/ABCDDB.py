@@ -3,13 +3,14 @@ import re
 import sys
 import sqlite3
 from base64 import b64encode
-from urllib.parse import quote
+# from urllib.parse import quote
 from typing import List, Dict, Any, Iterable, Optional
 
 ITEM_COUNTER = 0
 rx_query = re.compile(r'SELECT([\s\S]*)FROM[\s]+([A-Z_]+)')
 rx_cols = re.compile(r'[\s,;](Z[A-Z_]+)')
 rx_tags = re.compile(r'\%\{[A-Za-z_]+?\}')
+
 
 # ===============================
 #   Helper methods
@@ -60,6 +61,7 @@ def sanitize(cursor: sqlite3.Cursor, query: str) -> str:
               file=sys.stderr)
         query = query.replace(missing, 'NULL')
     return query
+
 
 # ===============================
 #   VCARD Attributes
@@ -279,7 +281,7 @@ class Service(Queryable):
 
         # Dear Apple, why do you do such weird shit, URL encoding? bah!
         # Even worse, you break it so that reimport fails.
-        # user = quote(self.username, safe='!/()=_:.\'$&').replace('%2C', '\\,')
+        # user= quote(self.username, safe='!/()=_:.\'$&').replace('%2C', '\\,')
         user = self.username
         return buildLabel('IMPP;X-SERVICE-TYPE=' + self.service, self.label,
                           markPref, typ + ':' + user)
