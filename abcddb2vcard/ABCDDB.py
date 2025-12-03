@@ -281,7 +281,7 @@ class Service(Queryable):
         elif self.service == 'Yahoo':
             typ = 'ymsgr'
         else:
-            raise NotImplementedError('Unkown Service: ' + self.service)
+            raise NotImplementedError('Unknown Service: ' + self.service)
 
         # Dear Apple, why do you do such weird shit, URL encoding? bah!
         # Even worse, you break it so that reimport fails.
