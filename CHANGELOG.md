@@ -13,7 +13,12 @@ and this project does adhere to [Semantic Versioning](https://semver.org/spec/v2
 
 ## [1.2.0] – 2025-06-09
 ### Added
-- Support for exporting external image files
+- Support for external images (referenced only by id within db)
+- Warning for missing `-wal` & `-shm` files
+- Warning for missing (and hidden) `.AddressBook-v22_SUPPORT` image storage folder
+
+### Removed
+- Warning for missing column `ZSERVICENAME` (column is not that important anyway)
 
 
 ## [1.1.1] – 2025-06-09
@@ -23,14 +28,21 @@ and this project does adhere to [Semantic Versioning](https://semver.org/spec/v2
 
 ## [1.1.0] – 2024-01-27
 ### Added
-- Multi-file export
+- Multi-file output. Use a formatter string to export each vcard individually.
 
 ### Fixed
-- Ignore non-existing columns
+- Continue processing of remaining entries if a single contact card fails to process
+- Ignore table columns that do not exist (e.g., `ZTHUMBNAILIMAGEDATA`)
 
 
 ## [1.0.1] – 2023-02-21
-Initial release
+### Added
+- Types
+- `abcddb2vcard` is now available on PyPi (`pip3 install abcddb2vcard`, then use `abcddb2vcard` or `vcard2img` in your shell)
+
+### Fixed
+- Crash when processing data fields with no corresponding Contact record
+
 
 
 [1.2.1]: https://github.com/relikd/abcddb2vcard/compare/v1.2.0...v1.2.1
